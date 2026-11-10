@@ -25,8 +25,8 @@ export function importImages(files) {
   return [...files].filter(f => /^image\//.test(f.type)).sort(naturalSort).map((f, i) => ({ blob: f, label: `Slide ${i + 1}` }));
 }
 
-/** Speaker notes from a .pptx, in slide order. Returns an array of strings (empty string when a slide has none). */
-export async function parsePptxNotes(file) {
+/** A .pptx: speaker notes per slide, plus each slide's text (used only if no PDF/images are given). */
+export async function parsePptx(file) {
   if (!window.JSZip) await new Promise((res, rej) => { const s = document.createElement("script"); s.src = new URL("../vendor/jszip.min.js", import.meta.url).href; s.onload = res; s.onerror = rej; document.head.append(s); });
   const zip = await window.JSZip.loadAsync(await file.arrayBuffer());
   const read = async p => { const f = zip.file(p); return f ? new DOMParser().parseFromString(await f.async("string"), "application/xml") : null; };
@@ -36,44 +36,45 @@ export async function parsePptxNotes(file) {
     return m;
   };
   const resolve = (base, target) => { const parts = (target.startsWith("/") ? target.slice(1) : base + target).split("/"); const o = []; for (const p of parts) { if (p === "..") o.pop(); else if (p !== ".") o.push(p); } return o.join("/"); };
+  const phType = sp => { const ph = sp.getElementsByTagName("p:ph")[0]; return ph ? (ph.getAttribute("type") || "body") : null; };
+  const paras = sp => [...sp.getElementsByTagName("a:p")].map(p => [...p.getElementsByTagName("a:t")].map(t => t.textContent).join("")).filter(Boolean);
   const pres = await read("ppt/presentation.xml"); const prel = await rels("ppt/_rels/presentation.xml.rels");
-  if (!pres) throw new Error("Not a PowerPoint file");
+  if (!pres) throw new Error("This does not look like a PowerPoint (.pptx) file");
   const ids = [...pres.getElementsByTagName("p:sldId")].map(e => e.getAttribute("r:id"));
-  const notes = [];
+  const notes = [], cards = [];
   for (const id of ids) {
     const slidePath = resolve("ppt/", prel[id].target);
     const dir = slidePath.slice(0, slidePath.lastIndexOf("/") + 1), name = slidePath.slice(dir.length);
+    const sd = await read(slidePath), skip = ["sldNum", "hdr", "ftr", "dt"];
+    const sps = sd ? [...sd.getElementsByTagName("p:sp")].filter(sp => !skip.includes(phType(sp))) : [];
+    const title = sps.filter(sp => ["title", "ctrTitle"].includes(phType(sp))).map(sp => paras(sp).join(" ")).join(" ");
+    const body = sps.filter(sp => !["title", "ctrTitle"].includes(phType(sp))).flatMap(paras);
+    cards.push({ title, body });
     const srel = await rels(`${dir}_rels/${name}.rels`);
     const n = Object.values(srel).find(r => r.type.endsWith("/notesSlide"));
-    if (!n) { notes.push(""); continue; }
-    const nd = await read(resolve(dir, n.target)); let text = "";
-    if (nd) {
-      const sps = [...nd.getElementsByTagName("p:sp")];
-      const body = sps.filter(sp => { const ph = sp.getElementsByTagName("p:ph")[0]; return ph && ph.getAttribute("type") === "body"; });
-      const use = body.length ? body : sps.filter(sp => { const ph = sp.getElementsByTagName("p:ph")[0]; return !ph || !["sldNum", "hdr", "ftr", "dt", "sldImg"].includes(ph.getAttribute("type")); });
-      text = use.map(sp => [...sp.getElementsByTagName("a:p")].map(p => [...p.getElementsByTagName("a:t")].map(t => t.textContent).join("")).join("\n")).join("\n").trim();
+    let text = "";
+    if (n) {
+      const nd = await read(resolve(dir, n.target));
+      if (nd) {
+        const nsp = [...nd.getElementsByTagName("p:sp")];
+        const nb = nsp.filter(sp => phType(sp) === "body");
+        const use = nb.length ? nb : nsp.filter(sp => !["sldNum", "hdr", "ftr", "dt", "sldImg"].includes(phType(sp)));
+        text = use.map(sp => paras(sp).join("\n")).join("\n").trim();
+      }
     }
     notes.push(text.replace(/^SAY\s*\([^)]*\):\s*/i, "").trim());
   }
-  return notes;
+  return { notes, cards };
 }
 
-/** A small generic deck so people can try the app without any files. */
-export async function makeSampleDeck() {
-  const slides = [
-    ["Welcome to SlideCast", "Record your talk one slide at a time", "Hi everyone. In this talk I will show how SlideCast works: you record a slide, press Next, and move on."],
-    ["How it works", "1  Import slides   2  Add your script   3  Record   4  Export", "First I import my slides. Then I paste or type what I want to say. I record each slide and press Next when I am done."],
-    ["Fix any slide", "Re-record only the slide you stumbled on", "If I make a mistake I press Re-record current slide. Only that part is replaced and everything else stays."],
-    ["Thank you", "Export one video when every slide has a tick", "That is it. When all slides are recorded I export one video file. Thank you for watching."],
-  ];
-  const out = [];
-  for (const [i, [title, sub, text]] of slides.entries()) {
-    const c = document.createElement("canvas"); c.width = 1920; c.height = 1080; const x = c.getContext("2d");
-    const g = x.createLinearGradient(0, 0, 1920, 1080); g.addColorStop(0, "#ffe4f4"); g.addColorStop(1, "#ffdcc4"); x.fillStyle = g; x.fillRect(0, 0, 1920, 1080);
-    x.fillStyle = "#16161a"; x.font = "700 120px -apple-system, Helvetica, Arial, sans-serif"; x.fillText(title, 120, 470);
-    x.font = "400 54px -apple-system, Helvetica, Arial, sans-serif"; x.fillStyle = "#4a4a55"; x.fillText(sub, 124, 580);
-    x.font = "600 40px -apple-system, Helvetica, Arial, sans-serif"; x.fillStyle = "#d65c28"; x.fillText(`${i + 1} / ${slides.length}`, 124, 980);
-    out.push({ blob: await canvasBlob(c), label: `Slide ${i + 1}`, text });
-  }
-  return out;
+/** Draws a plain slide from text, for a .pptx imported without a PDF. */
+export async function renderCard({ title, body }) {
+  const c = document.createElement("canvas"); c.width = 1920; c.height = 1080; const x = c.getContext("2d");
+  x.fillStyle = "#ffffff"; x.fillRect(0, 0, 1920, 1080);
+  const wrap = (text, font, maxW) => { x.font = font; const lines = []; let line = ""; for (const w of text.split(/\s+/)) { const t = line ? line + " " + w : w; if (x.measureText(t).width > maxW && line) { lines.push(line); line = w; } else line = t; } if (line) lines.push(line); return lines; };
+  let y = 170; x.fillStyle = "#16161a";
+  for (const l of wrap(title || "", "700 88px -apple-system, Helvetica, Arial, sans-serif", 1680).slice(0, 3)) { x.fillText(l, 120, y); y += 104; }
+  y += 30; x.fillStyle = "#3a3a44";
+  for (const para of body) for (const l of wrap(para, "400 52px -apple-system, Helvetica, Arial, sans-serif", 1640)) { if (y > 1000) break; x.fillText(l, 120, y); y += 70; }
+  return canvasBlob(c);
 }

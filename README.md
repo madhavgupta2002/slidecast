@@ -2,19 +2,20 @@
 
 Record a presentation **one slide at a time**, with a camera bubble you place yourself. Press **Next** when you finish a slide, **re-record** any slide you stumble on, then export **one video**.
 
-Everything runs in your browser. Slides, scripts and recordings are stored on your computer only (IndexedDB) and are never uploaded.
+Everything runs in your browser. Slides, notes and recordings are stored on your computer only (IndexedDB) and are never uploaded.
 
 ## Using it
 
-1. **Import slides.** Export your deck as a **PDF** (PowerPoint: File › Export › PDF; Keynote and Google Slides can too), or pick a set of images. Or press **Try the sample deck**.
-2. **Add a script** for each slide: type it, or press **Import notes (.pptx)** to fill the scripts from your PowerPoint speaker notes (import the PDF first, then the .pptx; slides are matched by order).
-3. Optional: **Add video clip** for a screen recording or demo. It plays by itself while you talk over it.
-4. **① Turn on camera & mic**, then **② Record from slide 1**. After a 3-second countdown, each slide records until you press **Next** (or the → key). The script shows beside the slide with a running timer.
-5. Re-record: **⟲ Re-record current slide** replaces only that part. Every part is listed on the right with a ✓, a re-record button, and ↑ ↓ ✕ to reorder or remove.
-6. Drag the camera bubble to move it, scroll over it (or use **Size**) to resize it. The corner buttons snap it to a corner, and **Use for all slides** copies the position everywhere. Each slide remembers its own.
-7. **③ Export video** joins all parts into one file (MP4 in Chrome and Edge, WebM in Firefox) and offers a download. The join does not re-encode, so it is fast and loses no quality.
+1. **Import slides.** Choose a **PDF** of your slides (PowerPoint: File › Export › PDF; Keynote and Google Slides can export PDF too), a set of **images**, or a **PowerPoint (.pptx)** file.
+   - Choose the **PDF and the PowerPoint together** to get your real slides *and* your speaker notes.
+   - A PowerPoint on its own gives you the speaker notes with plain text slides (a browser cannot draw PowerPoint design), so add the PDF too if you want your slides to look right. If you import the PDF first, you can add the PowerPoint afterwards; the notes are matched to the slides by order.
+2. **Read your notes.** The speaker notes for the current slide are shown beside it, large enough to read while you talk. You can edit them.
+3. **Place your camera.** Press **① Turn on camera & mic**. Drag the camera circle on the slide, scroll over it (or use **Camera size**) to resize it, or use the corner buttons. **Same for all slides** copies the position to every slide; otherwise each slide keeps its own.
+4. **Record.** Press **② Record from slide 1**. After a 3-second countdown the slide records until you press **Next** (or the → key), then the next slide starts. Press **Stop** (or Esc) to pause the session.
+5. **Fix mistakes.** Every slide is listed on the right with a ✓ once recorded. Select a slide and press **⟲ Re-record this slide**, or use the button in its row. Only that slide is replaced.
+6. **③ Export video** joins all slides into one file (MP4 in Chrome and Edge, WebM in Firefox) and offers a download. The join does not re-encode, so it is fast and loses no quality.
 
-**Save project** writes a `.slidecast.json` file with your slides and scripts (not your recordings), so you can move to another computer with **Open project**.
+Your slides, notes and recordings are kept in this browser, so a reload loses nothing. Importing a new deck replaces the old one.
 
 ## Run it on your computer
 
@@ -67,7 +68,7 @@ Command-line alternative: `npm i -g vercel`, then `vercel` in this folder (answe
 
 ### 3. Check the deployed site
 
-- Open the URL, press **Try the sample deck**, **① Turn on camera & mic** and allow access. (Cameras only work on `https://` or `localhost`; Vercel provides https.)
+- Open the URL, import a PDF, press **① Turn on camera & mic** and allow access. (Cameras only work on `https://` or `localhost`; Vercel provides https.)
 - Record two slides and press **③ Export video**. The first export downloads the 31 MB video engine, then it is cached.
 - Optional: add a custom domain under the project's **Settings › Domains**.
 
@@ -75,7 +76,7 @@ Command-line alternative: `npm i -g vercel`, then `vercel` in this folder (answe
 
 - No server code, no analytics, no accounts, no uploads. Camera and microphone data stay in your browser.
 - `vercel.json` sets a strict Content Security Policy (only this site's own scripts, no third parties), allows the camera and microphone for this site only, and blocks embedding in other sites.
-- Project files you open are treated as untrusted: text is shown as plain text, only image and video data is accepted, and numbers are clamped to safe ranges.
+- Text from your files (file names, speaker notes) is always shown as plain text, never as HTML.
 - Recordings live in this browser's storage. Clearing site data or using a private window removes them, so export your video before you clear anything.
 
 ## Browser support
@@ -89,7 +90,7 @@ npm install     # one time: installs the test tools
 npm test        # needs Google Chrome; set CHROME=/path/to/chrome if it is elsewhere
 ```
 
-The test drives real Chrome with a fake camera and microphone: it imports a deck, records every slide, re-records one, reloads, exports and checks the file with `ffprobe` (duration, audio and video in step), saves and reopens a project, and tries a hostile project file. To also test PDF and PowerPoint import, set `SAMPLE_PDF=/path/deck.pdf SAMPLE_PPTX=/path/deck.pptx`.
+The test drives real Chrome with a fake camera and microphone: it imports images, places the camera, records every slide, re-records one, reloads, exports and checks the file with `ffprobe` (duration, audio and video in step). To also test PDF and PowerPoint import, set `SAMPLE_PDF=/path/deck.pdf SAMPLE_PPTX=/path/deck.pptx`.
 
 ## Updating the bundled libraries
 
