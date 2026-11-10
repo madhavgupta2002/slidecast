@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SlideCast: record your presentation one slide at a time</title>
+<meta name="description" content="Import your slides, add a script, and record each slide with your camera. Re-record any slide, then export one video. Runs entirely in your browser.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23d65c28'/%3E%3Ccircle cx='16' cy='16' r='7' fill='white'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand"><span class="logo" aria-hidden="true"></span>SlideCast</div>
+  <input id="projName" class="name" aria-label="Presentation name" maxlength="80" value="My presentation">
+  <nav class="tools" aria-label="Project">
+    <button class="btn" id="slidesBtn" title="Import a PDF exported from PowerPoint or Keynote, or a set of images">Import slides</button>
+    <button class="btn" id="notesBtn" title="Fill the scripts from the speaker notes of a .pptx file">Import notes (.pptx)</button>
+    <button class="btn" id="clipBtn" title="Add a video clip that plays by itself while you talk over it">Add video clip</button>
+    <button class="btn" id="openBtn">Open project</button>
+    <button class="btn" id="saveProjBtn">Save project</button>
+    <button class="btn" id="newBtn">New</button>
+  </nav>
+</header>
+
+<div id="banner" role="alert" hidden></div>
+
+<section class="steps" aria-label="Recording steps">
+  <button class="btn" id="camBtn">① Turn on camera &amp; mic</button>
+  <button class="btn rec" id="startBtn" disabled>② Record from slide 1</button>
+  <button class="btn" id="rerecordBtn" disabled>⟲ Re-record current slide</button>
+  <button class="btn dark" id="stopBtn" disabled>Stop</button>
+  <button class="btn ok" id="exportBtn" disabled>③ Export video</button>
+  <span class="grow"></span>
+  <label class="inline">Camera <select id="camSel" disabled></select></label>
+  <label class="inline">Mic <select id="micSel" disabled></select></label>
+</section>
+
+<main>
+  <section class="card stagecard">
+    <div class="stagewrap">
+      <canvas id="stage" width="1920" height="1080"></canvas>
+      <div id="empty">
+        <h2>Start by importing your slides</h2>
+        <p>Export your deck as a <b>PDF</b> from PowerPoint, Keynote or Google Slides, or pick a set of images. Then add a script for each slide.</p>
+        <div class="row"><button class="btn dark big" id="emptyImport">Import slides</button><button class="btn big" id="emptySample">Try the sample deck</button></div>
+        <p class="hint">Everything stays in your browser. Nothing is uploaded.</p>
+      </div>
+    </div>
+    <div class="controls">
+      <button class="btn" id="prevBtn">◀ Back</button>
+      <button class="btn dark big" id="nextBtn">Next ▶</button>
+      <span class="hint" id="status">Turn on camera &amp; mic, then Record. Press <b>Next</b> (or →) when you finish each slide.</span>
+    </div>
+    <div class="controls">
+      <label class="inline"><input type="checkbox" id="bubble" checked> Show my camera</label>
+      <label class="inline"><input type="checkbox" id="mirror" checked> Mirror</label>
+      <label class="inline">Size <input type="range" id="size" min="80" max="420" value="170"></label>
+      <span class="inline">Corner
+        <button class="chip" data-corner="tl" title="Top left">↖</button><button class="chip" data-corner="tr" title="Top right">↗</button>
+        <button class="chip" data-corner="bl" title="Bottom left">↙</button><button class="chip" data-corner="br" title="Bottom right">↘</button>
+      </span>
+      <button class="btn" id="allPos" title="Copy this camera position and size to every slide">Use for all slides</button>
+      <label class="inline">Mic <span class="meter"><i id="lvl"></i></span></label>
+    </div>
+    <p class="hint">Drag the camera bubble to move it; scroll over it or use Size to resize. Each slide remembers its own position.</p>
+  </section>
+
+  <aside class="card side">
+    <div class="timerrow">
+      <div class="timer"><span id="cur">0:00</span> <small>/ <input id="tgt" type="number" min="1" max="3600" step="1" aria-label="Suggested seconds"> s suggested</small></div>
+      <div class="recdot" id="recdot">REC</div>
+    </div>
+    <div class="now">
+      <div class="lab" id="nowLab">No slides yet</div>
+      <textarea id="script" rows="6" placeholder="Type or paste what you want to say on this slide…" aria-label="Script for this slide"></textarea>
+      <label class="inline small">Script size <input type="range" id="fs" min="14" max="40" value="22"></label>
+    </div>
+    <div class="next" id="next"></div>
+    <div class="list" id="list" role="list"></div>
+    <p class="hint" id="saved"></p>
+  </aside>
+</main>
+
+<div id="count" aria-live="assertive">3</div>
+
+<div id="overlay" hidden>
+  <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="ovTitle">
+    <h2 id="ovTitle">Exporting</h2>
+    <p id="ovStatus"></p>
+    <progress id="ovBar" max="1" value="0"></progress>
+    <video id="ovVideo" controls playsinline hidden></video>
+    <div class="row">
+      <a class="btn dark" id="ovDownload" hidden>Download video</a>
+      <button class="btn" id="ovClose">Close</button>
+    </div>
+    <div id="ovParts" hidden></div>
+  </div>
+</div>
+
+<input type="file" id="slidesIn" accept="application/pdf,image/*" multiple hidden>
+<input type="file" id="notesIn" accept=".pptx,application/vnd.openxmlformats-officedocument.presentationml.presentation" hidden>
+<input type="file" id="clipIn" accept="video/*" hidden>
+<input type="file" id="projIn" accept=".json,.slidecast,application/json" hidden>
+<video id="clip" muted playsinline preload="auto" hidden></video>
+<video id="cam" muted playsinline hidden></video>
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
